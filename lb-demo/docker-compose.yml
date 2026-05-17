@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  broker:
+    build: ./broker
+    ports:
+      - "8000:8000"
+    volumes:
+      - db_data:/data
+    environment:
+      DB_PATH: /data/demo.db
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/v2/catalog')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  worker:
+    build: ./worker
+    volumes:
+      - db_data:/data
+    environment:
+      DB_PATH: /data/demo.db
+      POLL_INTERVAL_SECONDS: "2.0"
+    depends_on:
+      broker:
+        condition: service_healthy
+
+  control_plane:
+    build: ./control_plane
+    ports:
+      - "8001:8001"
+    volumes:
+      - db_data:/data
+    environment:
+      DB_PATH: /data/demo.db
+    depends_on:
+      broker:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  db_data:
